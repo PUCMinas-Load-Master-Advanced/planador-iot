@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "platformio.platformio-ide",
+        "rust-lang.rust-analyzer",
+        "ms-vscode.cpptools",
+        "wokwi.wokwi-vscode"
+    ]
+}

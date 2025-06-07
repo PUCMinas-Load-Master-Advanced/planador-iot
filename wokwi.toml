@@ -1,0 +1,12 @@
+[wokwi]
+version = 1
+elf = ".pio/build/esp32dev/firmware.elf"
+firmware = ".pio/build/esp32dev/firmware.bin"
+
+[[wokwi.uart]]
+port = 0
+baud = 115200
+
+[wokwi.wifi]
+ssid = "Wokwi-GUEST"
+password = ""
