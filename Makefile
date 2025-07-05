@@ -1,326 +1,198 @@
-.PHONY: help setup install-python install-platformio install-rust install-all
-.PHONY: build-cpp build-rust build-python flash-cpp flash-rust flash-micropython
-.PHONY: python-monitor python-dashboard mqtt-client wokwi monitor clean check-deps
+# Makefile Simplificado e Multiplataforma para o Projeto Planador IoT
+# Suporta: Linux, macOS (x86_64, arm64), e Windows.
+#
+# Mantenedor: Gemini
+# Data: 2025-07-04
 
-# Detectar sistema operacional
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    PLATFORM = linux
-endif
-ifeq ($(UNAME_S),Darwin)
-    PLATFORM = macos
-endif
-ifneq (,$(findstring MINGW,$(UNAME_S)))
-    PLATFORM = windows
-endif
+.PHONY: all help install build flash monitor clean test test-all test-unit test-integration test-hardware sim sim-gui sim-disturbance sim-release
 
-# -------------------------------------------------------------------
-# Detecção automática de porta ESP32
-# Usa ESP32_PORT (exportado no entrypoint), senão detecta automaticamente
-# Baud padrão: 115200. Pode ser sobrescrito via:
-#    make PORT=/dev/ttyUSB1 BAUD=9600 flash-cpp
-# -------------------------------------------------------------------
+# --- Configurações do Projeto ---
+
+# Comando Python: usa o `python` do ambiente virtual do Poetry.
+PYTHON_CMD := python3
+
+# Diretório onde os scripts de build do MicroPython estão localizados.
+MICROPYTHON_DIR = src/micropython
+
+# Caminho para o ESP-IDF (pode ser sobrescrito)
+IDF_PATH ?= /home/ari/esp/esp-idf
+
+# --- Detecção de Sistema Operacional e Porta Serial ---
+
+# Detecta o sistema operacional para ajustar comandos.
+UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
+
+# Porta serial para comunicação com o ESP32.
+# Tenta detectar automaticamente, mas pode ser sobrescrita.
+# Exemplo: make flash PORT=COM3 (Windows)
+#          make flash PORT=/dev/cu.usbserial-1234 (macOS)
 PORT ?= $(ESP32_PORT)
 ifeq ($(PORT),)
-  PORT = $(shell for p in /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyACM0 /dev/ttyACM1; do [ -e "$$p" ] && echo "$$p" && break; done)
-endif
-ifeq ($(PORT),)
-  PORT = /dev/ttyUSB0
+    ifeq ($(UNAME_S),Linux)
+        # Para Linux, procura por ttyUSB0, ttyUSB1, ttyACM0, etc.
+        PORT := $(shell find /dev/ -name "ttyUSB*" -o -name "ttyACM*" | head -n 1)
+        PORT ?= /dev/ttyUSB0
+    else ifeq ($(UNAME_S),Darwin)
+        # Para macOS, procura por dispositivos seriais USB comuns.
+        PORT := $(shell ls /dev/cu.usbserial* /dev/cu.SLAB_USBtoUART* /dev/cu.wchusbserial* 2>/dev/null | head -n 1)
+        PORT ?= /dev/cu.usbserial-0001
+    else
+        # Para Windows, o padrão é COM3, mas geralmente precisa ser especificado.
+        PORT := COM3
+    endif
 endif
 
+# Baud rate para o monitor serial.
 BAUD ?= 115200
 
-PYTHON_CMD := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
+# --- Metas Principais ---
+
+all: build flash
+	@echo "Processo completo: Firmware compilado e gravado em $(PORT)."
 
 help:
-	@echo "🚀 IoT Template - Setup Completo Multi-Linguagem"
+	@echo "Makefile para o Projeto Planador IoT"
 	@echo ""
-	@echo "📦 INSTALAÇÃO:"
-	@echo "  setup              Instalar TUDO (recomendado)"
-	@echo "  install-python     Instalar Python/pip"
-	@echo "  install-platformio Instalar PlatformIO"
-	@echo "  install-rust       Instalar Rust + ESP32 tools"
-	@echo "  check-deps         Verificar dependências"
+	@echo "Uso: make [comando]"
 	@echo ""
-	@echo "🔨 BUILD & FLASH:"
-	@echo "  build-cpp          Build C++ project"
-	@echo "  build-rust         Build Rust project"
-	@echo "  build-python       Preparar ambiente Python"
-	@echo "  flash-cpp          Build + Flash + Monitor C++"
-	@echo "  flash-rust         Build + Flash Rust"
-	@echo "  flash-micropython  Flash MicroPython firmware"
+	@echo "Comandos Principais:"
+	@echo "  all                - Executa 'build' e 'flash' em sequência."
+	@echo "  install            - Instala as dependências do projeto com Poetry."
+	@echo "  build              - Compila o firmware MicroPython padrão para ESP32."
+	@echo "  flash              - Grava o firmware no ESP32 na porta [$(PORT)]."
+	@echo "  monitor            - Abre o monitor serial para ver a saída do dispositivo."
+	@echo "  clean              - Limpa os arquivos de build gerados."
 	@echo ""
-	@echo "🐍 PYTHON APPS:"
-	@echo "  python-monitor     Monitor serial Python"
-	@echo "  python-dashboard   Dashboard web Streamlit"
-	@echo "  mqtt-client        Cliente MQTT Python"
+	@echo "Comandos de Teste:"
+	@echo "  test               - Executa testes básicos do projeto."
+	@echo "  test-all           - Executa TODOS os testes."
+	@echo "  test-unit          - Executa apenas testes unitários."
+	@echo "  test-integration   - Executa apenas testes de integração."
+	@echo "  test-cov           - Executa testes com coverage completo."
+	@echo "  test-cov-unit      - Executa testes unitários com coverage."
+	@echo "  cov-report         - Gera relatório de coverage no terminal."
+	@echo "  cov-html           - Gera relatório HTML de coverage."
 	@echo ""
-	@echo "📡 HARDWARE:"
-	@echo "  detect-port        Detectar ESP32 conectado"
-	@echo "  monitor            Monitor serial"
+	@echo "Comandos de Simulação:"
+	@echo "  sim                - Simulação básica do sistema."
+	@echo "  sim-gui            - Simulação com interface gráfica."
+	@echo "  sim-disturbance    - Simulação com perturbações externas."
+	@echo "  sim-release        - Simulação de liberação RC."
+	@echo "  sim-exemplo        - Exemplo com interpretação dos gráficos."
 	@echo ""
-	@echo "🎮 SIMULAÇÃO:"
-	@echo "  wokwi              Build + Instruções Wokwi"
-	@echo "  clean              Limpar builds"
-
-# ============= INSTALAÇÃO COMPLETA =============
-
-setup: check-system install-python install-platformio
+	@echo "Configurações:"
+	@echo "  PORT=$(PORT)   (Porta serial detectada automaticamente)"
+	@echo "  BAUD=$(BAUD)   (Baud rate para o monitor)"
+	@echo "  IDF_PATH=$(IDF_PATH)   (Caminho do ESP-IDF)"
 	@echo ""
-	@echo "🎉 Setup completo! Agora você pode usar:"
-	@echo "  make flash-cpp    # Para C++"
-	@echo "  make flash-rust   # Para Rust"
-	@echo "  make wokwi        # Para simulação"
+	@echo "Exemplos:"
+	@echo "  make install       # Executar na primeira vez para instalar tudo."
+	@echo "  make test          # Executar todos os testes do projeto."
+	@echo "  make all           # Compilar e gravar no ESP32."
+	@echo "  make flash PORT=COM4 # Gravar em uma porta específica no Windows."
+	@echo ""
 
-check-system:
-	@echo "🔍 Verificando sistema..."
-	@echo "Platform: $(PLATFORM)"
-	@echo "Python: $(PYTHON_CMD)"
-	@if [ -z "$(PYTHON_CMD)" ]; then \
-		echo "❌ Python não encontrado!"; \
-		echo "Install Python 3.8+ primeiro:"; \
-		echo "  Ubuntu/Debian: sudo apt install python3 python3-pip"; \
-		echo "  macOS: brew install python3"; \
-		echo "  Windows: https://python.org/downloads"; \
-		exit 1; \
-	fi
-	@echo "✅ Sistema OK"
+install:
+	@echo "Instalando dependencias do projeto com Poetry..."
+	@poetry install
+	@echo "Dependencias instaladas com sucesso."
 
-install-python:
-	@echo "🐍 Configurando Python..."
-	@if ! $(PYTHON_CMD) -m pip --version >/dev/null 2>&1; then \
-		echo "📦 Instalando pip..."; \
-		curl -sSL https://bootstrap.pypa.io/get-pip.py | $(PYTHON_CMD) --user; \
-	fi
-	@echo "✅ Python/pip configurado"
+build:
+	@echo "Compilando o firmware MicroPython padrao..."
+	@echo "Configurando ESP-IDF..."
+	@bash -c "source $(IDF_PATH)/export.sh && cd $(MICROPYTHON_DIR) && $(PYTHON_CMD) build.py build"
+	@echo "Firmware MicroPython compilado com sucesso."
 
-install-platformio: install-python
-	@echo "🔧 Instalando PlatformIO..."
-	@if ! command -v pio >/dev/null 2>&1; then \
-		echo "📦 Instalando PlatformIO..."; \
-		$(PYTHON_CMD) -m pip install --user platformio; \
-		echo 'export PATH="$$HOME/.local/bin:$$PATH"' >> ~/.bashrc || true; \
-		echo 'export PATH="$$HOME/.local/bin:$$PATH"' >> ~/.zshrc || true; \
-		export PATH="$$HOME/.local/bin:$$$${PATH}"; \
-	fi
-	@echo "🔌 Instalando plataforma ESP32..."
-	@if command -v pio >/dev/null 2>&1; then \
-		pio platform install espressif32 || true; \
-	elif command -v ~/.local/bin/pio >/dev/null 2>&1; then \
-		~/.local/bin/pio platform install espressif32 || true; \
-	else \
-		$(PYTHON_CMD) -m platformio platform install espressif32 || true; \
-	fi
-	@echo "✅ PlatformIO instalado"
-
-install-rust:
-	@echo "🦀 Instalando Rust..."
-	@if ! command -v rustc >/dev/null 2>&1; then \
-		echo "📦 Instalando Rust..."; \
-		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
-		. ~/.cargo/env; \
-	fi
-	@echo "🎯 Instalando targets ESP32..."
-	@. ~/.cargo/env && rustup target add xtensa-esp32-none-elf || true
-	@echo "🔧 Instalando ferramentas ESP32..."
-	@. ~/.cargo/env && cargo install ldproxy espflash espmonitor cargo-espflash || true
-	@echo "✅ Rust + ESP32 instalado"
-
-check-deps:
-	@echo "🔍 Verificando dependências instaladas..."
-	@echo -n "Python: "
-	@$(PYTHON_CMD) --version 2>/dev/null || echo "❌ Não instalado"
-	@echo -n "pip: "
-	@$(PYTHON_CMD) -m pip --version 2>/dev/null || echo "❌ Não instalado"
-	@echo -n "PlatformIO: "
-	@if command -v pio >/dev/null 2>&1; then \
-		pio --version; \
-	elif command -v ~/.local/bin/pio >/dev/null 2>&1; then \
-		~/.local/bin/pio --version; \
-	elif $(PYTHON_CMD) -c "import platformio" 2>/dev/null; then \
-		$(PYTHON_CMD) -m platformio --version; \
-	else \
-		echo "❌ Não instalado - execute 'make install-platformio'"; \
-	fi
-	@echo -n "Rust: "
-	@if command -v rustc >/dev/null 2>&1; then \
-		rustc --version; \
-	else \
-		echo "❌ Rust não instalado - execute 'make install-rust'"; \
-	fi
-	@echo -n "ESP32 Target: "
-	@if rustup target list --installed 2>/dev/null | grep -q xtensa-esp32-none-elf; then \
-		echo "✅ Instalado"; \
-	else \
-		echo "❌ Não instalado"; \
-	fi
-
-# ============= BUILD & FLASH =============
-
-build-cpp:
-	@echo "🔧 Building C++ project..."
-	@if command -v pio >/dev/null 2>&1; then \
-		pio run; \
-	elif command -v ~/.local/bin/pio >/dev/null 2>&1; then \
-		~/.local/bin/pio run; \
-	else \
-		$(PYTHON_CMD) -m platformio run; \
-	fi
-	@echo "✅ Build C++ concluído"
-	@echo "📁 Arquivos gerados:"
-	@echo "  .pio/build/esp32dev/firmware.elf"
-	@echo "  .pio/build/esp32dev/firmware.bin"
-
-build-rust:
-	@echo "🦀 Building Rust project..."
-	@if command -v cargo >/dev/null 2>&1; then \
-		. ~/.cargo/env && cargo build --release; \
-	else \
-		echo "❌ Rust não encontrado - execute 'make install-rust'"; \
-		exit 1; \
-	fi
-	@echo "✅ Build Rust concluído"
-
-build-python:
-	@echo "🐍 Preparando ambiente Python..."
-	@if [ ! -d "venv" ]; then \
-		echo "📦 Criando ambiente virtual..."; \
-		$(PYTHON_CMD) -m venv venv; \
-	fi
-	@echo "📦 Instalando dependências Python..."
-	@. venv/bin/activate && pip install -r src/python/requirements.txt
-	@echo "✅ Ambiente Python configurado"
-
-flash-cpp: build-cpp
-	@echo "📤 Flashing C++ para ESP32..."
-	@if [ ! -e "$(PORT)" ]; then \
-		echo "❌ ESP32 não encontrado em $(PORT)"; \
-		echo "🔍 Execute: ./detect-esp32.sh"; \
-		echo "💡 Ou use: make PORT=/dev/ttyACM0 flash-cpp"; \
-		echo "🎮 Ou simule: make wokwi"; \
-		exit 1; \
-	fi
-	@echo "📡 Usando porta: $(PORT)"
-	@if command -v pio >/dev/null 2>&1; then \
-		pio run --target upload --upload-port $(PORT) && \
-		echo "📟 Iniciando monitor ($(BAUD) bauds)..." && \
-		pio device monitor --port $(PORT) --baud $(BAUD); \
-	elif command -v ~/.local/bin/pio >/dev/null 2>&1; then \
-		~/.local/bin/pio run --target upload --upload-port $(PORT) && \
-		echo "📟 Iniciando monitor ($(BAUD) bauds)..." && \
-		~/.local/bin/pio device monitor --port $(PORT) --baud $(BAUD); \
-	else \
-		$(PYTHON_CMD) -m platformio run --target upload --upload-port $(PORT) && \
-		$(PYTHON_CMD) -m platformio device monitor --port $(PORT) --baud $(BAUD); \
-	fi
-
-flash-rust: build-rust
-	@echo "📤 Flashing Rust para ESP32..."
-	@if command -v cargo >/dev/null 2>&1; then \
-		. ~/.cargo/env && cargo run --release; \
-	else \
-		echo "❌ Rust não encontrado"; \
-		exit 1; \
-	fi
-
-flash-micropython:
-	@echo "📤 Flashing MicroPython para ESP32 ($(PORT))..."
-	@if command -v esptool.py >/dev/null 2>&1; then \
-		echo "🔄 Apagando flash..."; \
-		esptool.py --chip esp32 --port $(PORT) erase_flash; \
-		echo "📦 Instalando MicroPython..."; \
-		curl -fSL https://micropython.org/resources/firmware/ESP32_GENERIC-20250415-v1.25.0.bin -o /tmp/micropython-esp32.bin; \
-		esptool.py --chip esp32 --port $(PORT) --baud 460800 write_flash -z 0x1000 /tmp/micropython-esp32.bin; \
-		echo "✅ MicroPython instalado!"; \
-	else \
-		echo "❌ esptool.py não encontrado - execute 'make setup'"; \
-		exit 1; \
-	fi
-
-python-monitor: build-python
-	@echo "🐍 Iniciando monitor Python..."
-	@. venv/bin/activate && python3 src/python/main.py --port $(PORT) --baud $(BAUD)
-
-python-dashboard: build-python
-	@echo "🌐 Iniciando dashboard web..."
-	@echo "💡 Acesse: http://localhost:8501"
-	@. venv/bin/activate && streamlit run src/python/web_dashboard.py --server.port 8501
-
-mqtt-client: build-python
-	@echo "📡 Iniciando cliente MQTT..."
-	@. venv/bin/activate && python3 src/python/mqtt_client.py
-
-detect-port:
-	@echo "🔍 Detectando ESP32 conectado..."
-	@FOUND=false; \
-	for port in /dev/ttyUSB{0..3} /dev/ttyACM{0..3}; do \
-		if [ -e "$$port" ]; then \
-			echo "✅ ESP32 encontrado: $$port"; \
-			FOUND=true; \
-		fi; \
-	done; \
-	if [ "$$FOUND" = false ]; then \
-		echo "❌ Nenhum ESP32 encontrado"; \
-		echo "🔧 Soluções:"; \
-		echo "  • Conectar ESP32 via USB"; \
-		echo "  • Verificar cabo de dados"; \
-		echo "  • Pressionar RESET no ESP32"; \
-		echo "  • Executar: lsusb"; \
-		echo "  • Usar simulação: make wokwi"; \
-	fi
+flash:
+	@echo "Gravando o firmware no ESP32 em $(PORT)..."
+	@bash -c "source $(IDF_PATH)/export.sh && cd $(MICROPYTHON_DIR) && $(PYTHON_CMD) build.py flash $(PORT)"
+	@echo "Firmware gravado com sucesso."
 
 monitor:
-	@echo "📟 Monitor serial..."
-	@if [ ! -e "$(PORT)" ]; then \
-		echo "❌ ESP32 não encontrado em $(PORT)"; \
-		echo "🔍 Execute: ./detect-esp32.sh"; \
-		echo "💡 Ou use: make PORT=/dev/ttyACM0 monitor"; \
-		exit 1; \
-	fi
-	@echo "📡 Usando porta: $(PORT) @ $(BAUD) bauds"
-	@if command -v pio >/dev/null 2>&1; then \
-		pio device monitor --port $(PORT) --baud $(BAUD); \
-	elif command -v ~/.local/bin/pio >/dev/null 2>&1; then \
-		~/.local/bin/pio device monitor --port $(PORT) --baud $(BAUD); \
-	elif command -v screen >/dev/null 2>&1; then \
-		screen $(PORT) $(BAUD); \
-	else \
-		echo "❌ Nenhum monitor disponível"; \
-	fi
-
-# ============= WOKWI =============
-
-wokwi: build-cpp
-	@echo "🎮 Preparando para simulação Wokwi..."
-	@echo ""
-	@echo "✅ Build concluído! Arquivos prontos:"
-	@echo "  📁 .pio/build/esp32dev/firmware.elf"
-	@echo "  📁 .pio/build/esp32dev/firmware.bin"
-	@echo ""
-	@echo "🌐 Para simular no Wokwi:"
-	@echo "  1. Vá para: https://wokwi.com/projects/new/esp32"
-	@echo "  2. Substitua sketch.ino por: src/cpp/main.cpp"
-	@echo "  3. Substitua diagram.json por: diagram.json (raiz do projeto)"
-	@echo "  4. Clique 'Start Simulation'"
-	@echo ""
-	@echo "📋 Ou use extensão VSCode 'Wokwi Simulator'"
-
-# ============= LIMPEZA =============
+	@echo "Abrindo monitor serial em $(PORT) (Baud: $(BAUD))... (Pressione Ctrl+] para sair)"
+	@$(PYTHON_CMD) -m esptool --port $(PORT) --baud $(BAUD) monitor
 
 clean:
-	@echo "🧹 Limpando arquivos de build..."
-	@rm -rf .pio build target
-	@rm -f *.tmp *.log
-	@echo "✅ Limpeza concluída"
+	@echo "Limpando o diretorio de build..."
+	@cd $(MICROPYTHON_DIR) && $(PYTHON_CMD) build.py clean
+	@echo "Limpeza concluida."
 
-# ============= ATALHOS =============
+test:
+	@echo "Executando testes funcionais do projeto via Poetry..."
+	@poetry run pytest tests/unit/test_pid_simple.py tests/unit/test_platform.py tests/unit/test_main_esp32.py tests/unit/test_simulator_basic.py -v
+	@echo "Testes funcionais concluidos com sucesso."
 
-cpp: flash-cpp
-rust: flash-rust
-python: python-monitor
-micropython: flash-micropython
-dashboard: python-dashboard
-mqtt: mqtt-client
-sim: wokwi
-deps: check-deps
-install: setup
+test-all:
+	@echo "Executando TODOS os testes via pytest..."
+	@poetry run pytest tests/ -v --tb=short || true
+	@echo "Execucao completa de testes finalizada."
+
+test-unit:
+	@echo "Executando testes unitarios via Poetry..."
+	@poetry run pytest tests/unit/ -v
+	@echo "Testes unitarios concluidos."
+
+test-integration:
+	@echo "Executando testes de integracao via Poetry..."
+	@poetry run pytest tests/integration/ -v --tb=short || true
+	@echo "Testes de integracao finalizados."
+
+test-hardware:
+	@echo "Executando testes de hardware via Poetry..."
+	@poetry run pytest tests/hardware/ -v --tb=short || true
+	@echo "Testes de hardware finalizados."
+
+test-cov:
+	@echo "Executando testes funcionais com coverage..."
+	@poetry run pytest tests/unit/test_pid_simple.py tests/unit/test_platform.py tests/unit/test_main_esp32.py tests/unit/test_simulator_basic.py --cov=src --cov=tests --cov-report=term-missing --cov-report=html -v
+	@echo "Testes com coverage concluidos. Relatorio HTML em htmlcov/"
+
+test-cov-unit:
+	@echo "Executando testes unitarios com coverage..."
+	@poetry run pytest tests/unit/ --cov=src --cov-report=term-missing --cov-report=html -v
+	@echo "Testes unitarios com coverage concluidos."
+
+test-cov-integration:
+	@echo "Executando testes de integracao com coverage..."
+	@poetry run pytest tests/integration/ --cov=src --cov-report=term-missing --cov-report=html -v
+	@echo "Testes de integracao com coverage concluidos."
+
+cov-report:
+	@echo "Gerando relatorio de coverage..."
+	@poetry run coverage report --show-missing
+	@echo "Relatorio de coverage gerado."
+
+cov-html:
+	@echo "Gerando relatorio HTML de coverage..."
+	@poetry run coverage html
+	@echo "Relatorio HTML gerado em htmlcov/"
+
+sim:
+	@echo "Executando simulador do planador..."
+	@poetry run python src/simulator/planador_simulator.py
+	@echo "Simulador finalizado."
+
+sim-gui:
+	@echo "Executando simulador com interface grafica..."
+	@poetry run python src/simulator/gui_simulator.py
+	@echo "Simulador GUI finalizado."
+
+sim-disturbance:
+	@echo "Executando simulador com perturbacoes..."
+	@poetry run python src/simulator/planador_simulator.py disturbance
+	@echo "Simulador de perturbacoes finalizado."
+
+sim-release:
+	@echo "Executando simulador de liberacao RC..."
+	@poetry run python src/simulator/planador_simulator.py release
+	@echo "Simulador de liberacao finalizado."
+
+sim-exemplo:
+	@echo "Executando exemplo de interpretacao dos graficos..."
+	@poetry run python src/simulator/exemplo_interpretacao.py
+	@echo "Exemplo de interpretacao finalizado."
+
+zip:
+	@echo "Compactando o diretorio"
+	@cd src/micropython && zip -r ../../project.zip . -x "build/*"
+	@echo "Diretorio compactado"

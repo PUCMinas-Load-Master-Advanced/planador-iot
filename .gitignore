@@ -26,3 +26,26 @@ node_modules/
 .env.local
 .env.development
 .env.production
+*build
+poetry.lock
+*.claude
+
+# Arquivos de teste e coverage
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+test-results/
+.tox/
+.nox/
+coverage.json
+.coverage.*
+pytest.ini
+.testmondata
+
+# Arquivos temporarios de teste
+temp_test_*
+*_test_temp*
+test_output/
+*.test.log
+.test_artifacts/

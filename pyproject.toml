@@ -1,0 +1,78 @@
+[project]
+name = "planador-iot"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "AriHenrique",email = "arihenriquedev@hotmail.com"}
+]
+readme = "README.md"
+requires-python = "=3.11.*"
+dependencies = [
+    "rpi-gpio (>=0.7.1,<0.8.0)",
+    "paho-mqtt (>=2.1.0,<3.0.0)",
+    "adafruit-circuitpython-servokit (>=1.3.20,<2.0.0)",
+    "adafruit-circuitpython-mpu6050 (>=1.3.3,<2.0.0)",
+    "adafruit-circuitpython-bmp3xx (>=1.3.23,<2.0.0)",
+    "pyserial (>=3.5,<4.0)",
+    "pynmea2 (>=1.19.0,<2.0.0)",
+    "machine (>=0.0.1,<0.0.2)",
+    "platformio (>=6.1.18,<7.0.0)",
+    "python-machine (>=1.0.4,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "planador_iot", from = "src"}]
+
+
+[tool.poetry.group.dev.dependencies]
+scipy = "^1.15.3"
+scikit-learn = "^1.7.0"
+pytest = "^8.2.2"
+matplotlib = "^3.8.0"
+pytest-cov = "^6.0.0"
+coverage = "^7.6.0"
+
+[tool.poetry.scripts]
+test = "tests.unit.test_pid_simple:main"
+sim = "src.simulator.planador_simulator:main"
+sim-gui = "src.simulator.gui_simulator:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --cov=src --cov-report=term-missing --cov-report=html --cov-report=xml"
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\(Protocol\\):",
+    "@(abc\\.)?abstractmethod"
+]
+show_missing = true
+skip_covered = false
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

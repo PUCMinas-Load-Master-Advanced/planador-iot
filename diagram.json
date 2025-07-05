@@ -1,27 +1,196 @@
 {
   "version": 1,
-  "author": "IoT Template",
+  "author": "Sistema Atualizado - Nave Mãe (8 servos) vs Planador (4 servos) - Com Botão Desativar",
+  "editor": "wokwi",
   "parts": [
-    {"type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {}},
-    {"type": "wokwi-led", "id": "led1", "top": -67.2, "left": 201.6, "attrs": {"color": "red"}},
-    {"type": "wokwi-resistor", "id": "r1", "top": -57.6, "left": 220.8, "attrs": {"value": "220"}},
-    {"type": "wokwi-potentiometer", "id": "pot1", "top": 86.4, "left": 345.6, "attrs": {}},
-    {"type": "wokwi-dht22", "id": "dht1", "top": -105.6, "left": 57.6, "attrs": {}},
-    {"type": "wokwi-pushbutton", "id": "btn1", "top": -76.8, "left": 384, "attrs": {"color": "green"}}
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 782.3, "left": 724.6, "attrs": {} },
+    { "type": "wokwi-mpu6050", "id": "imu", "top": -5.78, "left": 463.12, "attrs": {} },
+    {
+      "type": "wokwi-servo",
+      "id": "flaps_left",
+      "top": 190,
+      "left": 873.6,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "flaps_right",
+      "top": 190,
+      "left": 1190.4,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "airbrake",
+      "top": 169,
+      "left": 1037.8,
+      "rotate": 90,
+      "attrs": { "color": "orange" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "elevator_left",
+      "top": 5.8,
+      "left": 970.6,
+      "rotate": 90,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "elevator_right",
+      "top": 5.8,
+      "left": 1105,
+      "rotate": 90,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "rudder",
+      "top": 334,
+      "left": 1036.8,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_system_active",
+      "top": 0,
+      "left": 0,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_aircraft_type",
+      "top": 0,
+      "left": 100,
+      "attrs": { "color": "blue" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_mode",
+      "top": 0,
+      "left": 200,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_alert",
+      "top": 0,
+      "left": 300,
+      "attrs": { "color": "#FF6600" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_system",
+      "top": 25,
+      "left": 20,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_aircraft",
+      "top": 25,
+      "left": 120,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_mode",
+      "top": 25,
+      "left": 220,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_alert",
+      "top": 25,
+      "left": 320,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_mode",
+      "top": -13,
+      "left": -355.2,
+      "attrs": { "color": "blue", "label": "MODO" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_deactivate",
+      "top": -13,
+      "left": -249.6,
+      "attrs": { "color": "red", "label": "DESATIVAR" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "led_system_label",
+      "top": -57.6,
+      "left": -9.6,
+      "attrs": { "text": "SISTEMA\nATIVO", "color": "green", "size": "7" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "led_type_label",
+      "top": 48,
+      "left": 105.6,
+      "attrs": { "text": "TIPO\nAERONAVE", "color": "blue", "size": "7" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "led_mode_label",
+      "top": -28.8,
+      "left": 192,
+      "attrs": { "text": "MODO VOO", "color": "#CCAA00", "size": "7" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "led_alert_label",
+      "top": -9.6,
+      "left": 345.6,
+      "attrs": { "text": "ALERTAS", "color": "#FF6600", "size": "7" }
+    }
   ],
   "connections": [
-    ["esp:TX0", "$serialMonitor:RX", "", []],
-    ["esp:RX0", "$serialMonitor:TX", "", []],
-    ["esp:D2", "led1:A", "green", []],
-    ["led1:C", "r1:1", "black", []],
-    ["r1:2", "esp:GND.1", "black", []],
-    ["esp:3V3", "pot1:VCC", "red", []],
-    ["esp:GND.2", "pot1:GND", "black", []],
-    ["esp:A0", "pot1:SIG", "blue", []],
-    ["esp:D4", "dht1:SDA", "yellow", []],
-    ["esp:3V3", "dht1:VCC", "red", []],
-    ["esp:GND.1", "dht1:GND", "black", []],
-    ["esp:D15", "btn1:1.l", "purple", []],
-    ["esp:GND.2", "btn1:2.l", "black", []]
-  ]
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "esp:3V3", "imu:VCC", "red", [] ],
+    [ "esp:GND", "imu:GND", "black", [] ],
+    [ "esp:D21", "imu:SDA", "green", [] ],
+    [ "esp:D22", "imu:SCL", "yellow", [] ],
+    [ "esp:D25", "flaps_left:PWM", "orange", [] ],
+    [ "esp:5V", "flaps_left:V+", "red", [] ],
+    [ "esp:GND", "flaps_left:GND", "black", [] ],
+    [ "esp:D26", "flaps_right:PWM", "orange", [] ],
+    [ "esp:5V", "flaps_right:V+", "red", [] ],
+    [ "esp:GND", "flaps_right:GND", "black", [] ],
+    [ "esp:D33", "airbrake:PWM", "orange", [] ],
+    [ "esp:5V", "airbrake:V+", "red", [] ],
+    [ "esp:GND", "airbrake:GND", "black", [] ],
+    [ "esp:D14", "elevator_left:PWM", "orange", [] ],
+    [ "esp:5V", "elevator_left:V+", "red", [] ],
+    [ "esp:GND", "elevator_left:GND", "black", [] ],
+    [ "esp:D32", "elevator_right:PWM", "orange", [] ],
+    [ "esp:5V", "elevator_right:V+", "red", [] ],
+    [ "esp:GND", "elevator_right:GND", "black", [] ],
+    [ "esp:D27", "rudder:PWM", "orange", [] ],
+    [ "esp:5V", "rudder:V+", "red", [] ],
+    [ "esp:GND", "rudder:GND", "black", [] ],
+    [ "esp:D15", "r_system:1", "green", [] ],
+    [ "r_system:2", "led_system_active:A", "green", [] ],
+    [ "led_system_active:C", "esp:GND", "black", [] ],
+    [ "esp:D2", "r_aircraft:1", "blue", [] ],
+    [ "r_aircraft:2", "led_aircraft_type:A", "blue", [] ],
+    [ "led_aircraft_type:C", "esp:GND", "black", [] ],
+    [ "esp:D4", "r_mode:1", "yellow", [] ],
+    [ "r_mode:2", "led_mode:A", "yellow", [] ],
+    [ "led_mode:C", "esp:GND", "black", [] ],
+    [ "esp:D19", "r_alert:1", "orange", [] ],
+    [ "r_alert:2", "led_alert:A", "orange", [] ],
+    [ "led_alert:C", "esp:GND", "black", [] ],
+    [ "esp:D34", "btn_mode:1.l", "gray", [] ],
+    [ "btn_mode:2.l", "esp:GND", "black", [] ],
+    [ "esp:D17", "btn_deactivate:1.l", "red", [] ],
+    [ "btn_deactivate:2.l", "esp:GND", "black", [] ],
+    [ "esp:D18", "btn_deactivate:1.l", "green", [ "h0" ] ]
+  ],
+  "dependencies": {}
 }
