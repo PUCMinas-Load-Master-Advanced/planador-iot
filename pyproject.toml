@@ -1,29 +1,24 @@
-[project]
+[tool.poetry]
 name = "planador-iot"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "AriHenrique",email = "arihenriquedev@hotmail.com"}
-]
+description = "Projeto de IoT para planador autônomo"
+authors = ["AriHenrique <arihenriquedev@hotmail.com>"]
 readme = "README.md"
-requires-python = "=3.11.*"
-dependencies = [
-    "rpi-gpio (>=0.7.1,<0.8.0)",
-    "paho-mqtt (>=2.1.0,<3.0.0)",
-    "adafruit-circuitpython-servokit (>=1.3.20,<2.0.0)",
-    "adafruit-circuitpython-mpu6050 (>=1.3.3,<2.0.0)",
-    "adafruit-circuitpython-bmp3xx (>=1.3.23,<2.0.0)",
-    "pyserial (>=3.5,<4.0)",
-    "pynmea2 (>=1.19.0,<2.0.0)",
-    "machine (>=0.0.1,<0.0.2)",
-    "platformio (>=6.1.18,<7.0.0)",
-    "python-machine (>=1.0.4,<2.0.0)",
-    "matplotlib (>=3.10.3,<4.0.0)"
-]
+packages = [{ include = "planador_iot", from = "src" }]
 
-[tool.poetry]
-packages = [{include = "planador_iot", from = "src"}]
-
+[tool.poetry.dependencies]
+python = "^3.11"
+rpi-gpio = ">=0.7.1,<0.8.0"
+paho-mqtt = ">=2.1.0,<3.0.0"
+adafruit-circuitpython-servokit = ">=1.3.20,<2.0.0"
+adafruit-circuitpython-mpu6050 = ">=1.3.3,<2.0.0"
+adafruit-circuitpython-bmp3xx = ">=1.3.23,<2.0.0"
+pyserial = ">=3.5,<4.0"
+pynmea2 = ">=1.19.0,<2.0.0"
+machine = ">=0.0.1,<0.0.2"
+platformio = ">=6.1.18,<7.0.0"
+python-machine = ">=1.0.4,<2.0.0"
+matplotlib = ">=3.10.3,<4.0.0"
 
 [tool.poetry.group.dev.dependencies]
 scipy = "^1.15.3"
@@ -74,5 +69,5 @@ precision = 2
 directory = "htmlcov"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
